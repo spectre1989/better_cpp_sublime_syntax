@@ -1,0 +1,121 @@
+%YAML 1.2
+---
+name: C/C++ (better)
+file_extensions: [h, c, hpp, cpp, inl]
+scope: source.c++
+variables:
+  name: '[A-Za-z_]\w*'
+contexts:
+  main:
+    - include: common
+
+    - match: '#'
+      push: preprocessor
+
+    - match: \bnamespace\b
+      scope: keyword.control.c++
+      set: namespace_name
+
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+
+    # Numbers - should this be somewhere else?
+    - match: '\b(-)?[0-9.]+\b'
+      scope: constant.numeric.c++
+
+# todo(jbr) punctuation.accessor for :: . ->
+# todo(jbr) entity.name.function when defined, variable.function when invoked
+# todo(jbr) do we need anything for the * or & symbols in variables?
+
+    - match: \b{{name}}\b
+      scope: storage.type.c++
+      set:
+        - match: \b(static|inline|const|extern)\b
+          scope: storage.modifier.c++
+        - match: \b{{name}}\b
+          scope: entity.name.function
+          set: 
+            - match: '\('
+              set: function_params
+
+  common:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character
+    - match: '"'
+      scope: punctuation.definition.string.begin.c++
+      push: double_quoted_string
+
+    # Comments begin with a '//' and finish at the end of the line
+    - match: '//'
+      scope: punctuation.definition.comment.c++
+      push: line_comment
+
+    # block comments
+    - match: '/\*'
+      scope: punctuation.definition.comment.c++
+      push: block_comment
+
+  double_quoted_string:
+    - meta_scope: string.quoted.double.c++
+    - match: '\\.'
+      scope: constant.character.escape.c++
+    - match: '"'
+      scope: punctuation.definition.string.end.c++
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.c++
+    - match: $
+      pop: true
+
+  block_comment:
+    - meta_scope: comment.block.c++
+    - match: '\*/'
+      scope: punctuation.definition.comment.c++
+      pop: true
+
+# generic handling of preprocessor
+  preprocessor:
+    - meta_scope: keyword.control.import.c++
+    - include: common
+    - match: <
+      scope: punctuation.definition.generic.begin.c++
+      push:
+        - meta_scope: string.quoted.other
+        - match: '>'
+          scope: punctuation.definition.generic.end.c++
+          pop: true
+    - match: $
+      pop: true
+
+# after namespace keyword, find name of namespace if it exists
+  namespace_name:
+    - match: \w
+      push:
+        - meta_scope: entity.name.namespace.c++
+        - match: \b
+          pop: true
+    - match: '{'
+      pop: true
+
+# after opening parenthesis, this finds params
+  function_params:
+    - match: '\)'
+      set:
+        - match: ;
+          pop: true
+        - match: '{'
+          set: function_body
+    - match: \bconst\b
+      scope: storage.modifier.c++
+    - match: \b{{name}}\b
+      scope: storage.type.c++
+      set:
+        - match: \b{{name}}\b
+          scope: variable.parameter
+          set: function_params
+
+  function_body:
+    - match: '}'
+      pop: true
+    - include: common
