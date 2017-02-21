@@ -1,10 +1,16 @@
 %YAML 1.2
 ---
+# todo(jbr) punctuation.accessor for :: . ->
+# todo(jbr) entity.name.function when defined, variable.function when invoked
+# todo(jbr) do we need anything for the * or & symbols in variables?
+# todo(jbr) forward decls
+# note to self - lookaheads don't consume, captures do
 name: C/C++ (better)
 file_extensions: [h, c, hpp, cpp, inl]
 scope: source.c++
 variables:
   name: '[A-Za-z_]\w*'
+  type_name: '[A-Za-z_][\w:]*' # types can have :: in for example std::string
 contexts:
   main:
     - include: common
@@ -16,27 +22,21 @@ contexts:
       scope: keyword.control.c++
       set: namespace_name
 
-    - match: \b(static|inline|const|extern)\b
+    - match: \bconst\b
       scope: storage.modifier.c++
-
-    # Numbers - should this be somewhere else?
-    - match: '\b(-)?[0-9.]+\b'
-      scope: constant.numeric.c++
-
-# todo(jbr) punctuation.accessor for :: . ->
-# todo(jbr) entity.name.function when defined, variable.function when invoked
-# todo(jbr) do we need anything for the * or & symbols in variables?
-
-    - match: \b{{name}}\b
-      scope: storage.type.c++
       set:
         - match: \b(static|inline|const|extern)\b
           scope: storage.modifier.c++
-        - match: \b{{name}}\b
-          scope: entity.name.function
-          set: 
-            - match: '\('
-              set: function_params
+        - match: \b{{type_name}}\b
+          scope: storage.type.c++
+          set: possible_const_variable_or_function
+
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+
+    - match: \b{{type_name}}\b
+      scope: storage.type.c++
+      set: variable_or_function
 
   common:
     # Strings begin and end with quotes, and use backslashes as an escape
@@ -50,10 +50,18 @@ contexts:
       scope: punctuation.definition.comment.c++
       push: line_comment
 
-    # block comments
+    # Block comments
     - match: '/\*'
       scope: punctuation.definition.comment.c++
       push: block_comment
+
+    # Numbers
+    - match: '\b(-)?[0-9.]+\b'
+      scope: constant.numeric.c++
+
+    # Nullptr
+    - match: \b(nullptr|true|false)\b
+      scope: constant.language.c++
 
   double_quoted_string:
     - meta_scope: string.quoted.double.c++
@@ -102,12 +110,15 @@ contexts:
   function_params:
     - match: '\)'
       set:
+        - match: \bconst\b
+          scope: storage.modifier.c++
         - match: ;
           pop: true
         - match: '{'
           set: function_body
     - match: \bconst\b
       scope: storage.modifier.c++
+    - include: common
     - match: \b{{name}}\b
       scope: storage.type.c++
       set:
@@ -115,7 +126,146 @@ contexts:
           scope: variable.parameter
           set: function_params
 
+  possible_const_variable_or_function:
+    # if we find a *, then the const is part of the type, e.g.
+    # char const* str = "xyz";
+    # str is not actually const, it's a non const ptr to const char
+    - match: '\*'
+      set: variable_or_function
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+    - match: '\b{{name}}(?=\s*\()'
+      scope: entity.name.function.c++
+      set: after_function_name
+    - match: \b{{name}}\b
+      scope: variable.other.constant.c++
+      pop: true
+
+  after_function_name:
+    - match: '\('
+      set: function_params
+
+  variable_or_function:
+    - match: \bconst\b
+      scope: storage.modifier.c++
+      set: possible_const_variable_or_function
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+    - match: '\b{{name}}(?=\s*\()'
+      scope: entity.name.function.c++
+      set: after_function_name
+    - match: \b{{name}}\b
+      scope: variable.other.readwrite.c++
+      pop: true
+
   function_body:
+    - meta_scope: function
+
+    - match: '{'
+      push: function_body
+
     - match: '}'
       pop: true
+
     - include: common
+
+    - match: \bif\b
+      scope: keyword.control.conditional.c++
+      push:
+        - match: '\('
+          set: function_params_in_func
+
+    - match: \breturn\b
+      scope: keyword.control.c++
+
+    - match: \b{{name}}\b(?=\s*\()
+      scope: variable.function.c++
+      push:
+        - match: '\('
+          set: function_params_in_func
+
+    - match: '\b{{type_name}}(?=::\w*\()'
+      scope: storage.type.c++
+      push:
+        - match: \b{{name}}\b
+          scope: variable.function.c++
+          set:
+            - match: '\(' 
+              set: function_params_in_func
+
+    - match: '(?<=\.){{name}}(?=\s*\()'
+      scope: variable.function.c++
+      push:
+        - match: '\('
+          set: function_params_in_func
+
+    # Would be nice to consolidate from main, but not sure how. In main, something like
+    # int do_thing(int x);
+    # is a function declaration, within a function there are no declarations, they're
+    # all calls.
+    - match: \bconst\b
+      scope: storage.modifier.c++
+      push:
+        - match: \b(static|inline|const|extern)\b
+          scope: storage.modifier.c++
+        - match: \b{{type_name}}\b
+          scope: storage.type.c++
+          set: possible_const_variable_in_func
+
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+
+    - match: \b{{type_name}}\b
+      scope: storage.type.c++
+      push: variable_in_func
+
+    - match: (?<=\s)=(?=\s)
+      scope: keyword.operator.assignment
+      push:
+        - match: ';'
+          pop: true
+        - include: common
+        - match: \b{{name}}\b
+          scope: variable.other.c++
+
+  function_params_in_func:
+    - meta_content_scope: function_params
+    - match: '\)'
+      pop: true
+    - match: '\('
+      push: function_params_in_func
+    - include: common
+    - match: '\b{{type_name}}(?=::\w*\()'
+      scope: storage.type.c++
+      push:
+        - match: \b{{name}}\b
+          scope: variable.function.c++
+          set:
+            - match: '\('
+              set: function_params_in_func
+    - match: \b{{name}}\b(?=\s*\()
+      scope: variable.function.c++
+    - match: \b{{name}}\b
+      scope: variable.other.c++
+
+  possible_const_variable_in_func:
+    # if we find a *, then the const is part of the type, e.g.
+    # char const* str = "xyz";
+    # str is not actually const, it's a non const ptr to const char
+    - match: '\*'
+      set: variable_in_func
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+    - match: \b{{name}}\b
+      scope: variable.other.constant.c++
+      pop: true
+
+  variable_in_func:
+    - match: \bconst\b
+      scope: storage.modifier.c++
+      set: possible_const_variable_or_function
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+    - match: \b{{name}}\b
+      scope: variable.other.readwrite.c++
+      pop: true
