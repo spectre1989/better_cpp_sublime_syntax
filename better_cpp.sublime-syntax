@@ -56,7 +56,7 @@ contexts:
       push: block_comment
 
     # Numbers
-    - match: '\b(-)?[0-9.]+\b'
+    - match: '\b[-]?[0-9]+[.]?[0-9]*[f]?\b'
       scope: constant.numeric.c++
 
     # Nullptr
@@ -123,7 +123,7 @@ contexts:
       scope: storage.type.c++
       set:
         - match: \b{{name}}\b
-          scope: variable.parameter
+          scope: variable.parameter.c++
           set: function_params
 
   possible_const_variable_or_function:
@@ -178,6 +178,16 @@ contexts:
     - match: \breturn\b
       scope: keyword.control.c++
 
+    - match: \b{{name}}\b(?=\.)
+      scope: variable.other.c++
+      push:
+        - match: \.
+          scope: punctuation.accessor.c++
+          pop: true
+
+    - match: \b{{name}}\b(?=\s*[=;])
+      scope: variable.other.c++
+
     - match: \b{{name}}\b(?=\s*\()
       scope: variable.function.c++
       push:
@@ -199,10 +209,6 @@ contexts:
         - match: '\('
           set: function_params_in_func
 
-    # Would be nice to consolidate from main, but not sure how. In main, something like
-    # int do_thing(int x);
-    # is a function declaration, within a function there are no declarations, they're
-    # all calls.
     - match: \bconst\b
       scope: storage.modifier.c++
       push:
@@ -221,12 +227,6 @@ contexts:
 
     - match: (?<=\s)=(?=\s)
       scope: keyword.operator.assignment
-      push:
-        - match: ';'
-          pop: true
-        - include: common
-        - match: \b{{name}}\b
-          scope: variable.other.c++
 
   function_params_in_func:
     - meta_content_scope: function_params
