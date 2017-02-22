@@ -4,6 +4,8 @@
 # todo(jbr) entity.name.function when defined, variable.function when invoked
 # todo(jbr) do we need anything for the * or & symbols in variables?
 # todo(jbr) forward decls
+# todo(jbr) variable.language for 'this'
+# todo(jbr) variable.other.member for member variables (not functions)
 # note to self - lookaheads don't consume, captures do
 name: C/C++ (better)
 file_extensions: [h, c, hpp, cpp, inl]
@@ -85,7 +87,9 @@ contexts:
 # generic handling of preprocessor
   preprocessor:
     - meta_scope: keyword.control.import.c++
+
     - include: common
+
     - match: <
       scope: punctuation.definition.generic.begin.c++
       push:
@@ -93,6 +97,7 @@ contexts:
         - match: '>'
           scope: punctuation.definition.generic.end.c++
           pop: true
+
     - match: $
       pop: true
 
@@ -169,25 +174,31 @@ contexts:
 
     - include: common
 
-    - match: \bif\b
+    - match: \b(if|else|for|while|do)\b
       scope: keyword.control.conditional.c++
 
-    - match: \breturn\b
+    - match: \b(return)\b
       scope: keyword.control.c++
 
-    - match: \bconst\b
+    - match: \b(const|static)\b
       scope: storage.modifier.c++
 
-    - match: \b{{name}}\b(?=\s*[;=\)\|\.-])
+    - match: \b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])
       scope: variable.other.c++
+
+    # attempting to match something like:
+    # std::string s("value");
+    #- match: '(?<=\w)\s*\b{{name}}\b(?=\s*\()'
+    #  scope: variable.other.c++
+    - match: '\b({{name}})\b\s+\b({{name}})\b(?=\s*\()'
+      captures:
+        1: storage.type.c++
+        2: variable.other.c++
 
     - match: \b{{name}}\b(?=\s*\()
       scope: variable.function.c++
 
-    - match: '\b{{name}}(?=::)'
-      scope: storage.type.c++
-
-    - match: \b{{type_name}}\b
+    - match: \b{{name}}\b
       scope: storage.type.c++
 
     - match: '(->|\.|::)'
@@ -204,45 +215,3 @@ contexts:
 
     - match: (\+|-|\*|\\)
       scope: keyword.operator.arithmetic.c++
-
-  function_params_in_func:
-    - meta_content_scope: function_params
-    - match: '\)'
-      pop: true
-    - match: '\('
-      push: function_params_in_func
-    - include: common
-    - match: '\b{{type_name}}(?=::\w*\()'
-      scope: storage.type.c++
-      push:
-        - match: \b{{name}}\b
-          scope: variable.function.c++
-          set:
-            - match: '\('
-              set: function_params_in_func
-    - match: \b{{name}}\b(?=\s*\()
-      scope: variable.function.c++
-    - match: \b{{name}}\b
-      scope: variable.other.c++
-
-  possible_const_variable_in_func:
-    # if we find a *, then the const is part of the type, e.g.
-    # char const* str = "xyz";
-    # str is not actually const, it's a non const ptr to const char
-    - match: '\*'
-      set: variable_in_func
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
-    - match: \b{{name}}\b
-      scope: variable.other.constant.c++
-      pop: true
-
-  variable_in_func:
-    - match: \bconst\b
-      scope: storage.modifier.c++
-      set: possible_const_variable_or_function
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
-    - match: \b{{name}}\b
-      scope: variable.other.readwrite.c++
-      pop: true
