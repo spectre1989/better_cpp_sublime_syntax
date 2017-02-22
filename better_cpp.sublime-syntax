@@ -13,6 +13,7 @@ scope: source.c++
 variables:
   name: '[A-Za-z_]\w*'
   type_name: '[A-Za-z_][\w:]*' # types can have :: in for example std::string
+  variable_in_function: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])'
 contexts:
   main:
     - include: common
@@ -183,13 +184,14 @@ contexts:
     - match: \b(const|static)\b
       scope: storage.modifier.c++
 
-    - match: \b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])
+    - match: '(?<=::|\.|->){{variable_in_function}}'
+      scope: variable.other.member.c++
+
+    - match: '{{variable_in_function}}'
       scope: variable.other.c++
 
     # attempting to match something like:
     # std::string s("value");
-    #- match: '(?<=\w)\s*\b{{name}}\b(?=\s*\()'
-    #  scope: variable.other.c++
     - match: '\b({{name}})\b\s+\b({{name}})\b(?=\s*\()'
       captures:
         1: storage.type.c++
