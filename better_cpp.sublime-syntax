@@ -171,62 +171,39 @@ contexts:
 
     - match: \bif\b
       scope: keyword.control.conditional.c++
-      push:
-        - match: '\('
-          set: function_params_in_func
 
     - match: \breturn\b
       scope: keyword.control.c++
 
-    - match: \b{{name}}\b(?=\.)
-      scope: variable.other.c++
-      push:
-        - match: \.
-          scope: punctuation.accessor.c++
-          pop: true
+    - match: \bconst\b
+      scope: storage.modifier.c++
 
-    - match: \b{{name}}\b(?=\s*[=;])
+    - match: \b{{name}}\b(?=\s*[;=\)\|\.-])
       scope: variable.other.c++
 
     - match: \b{{name}}\b(?=\s*\()
       scope: variable.function.c++
-      push:
-        - match: '\('
-          set: function_params_in_func
 
-    - match: '\b{{type_name}}(?=::\w*\()'
+    - match: '\b{{name}}(?=::)'
       scope: storage.type.c++
-      push:
-        - match: \b{{name}}\b
-          scope: variable.function.c++
-          set:
-            - match: '\(' 
-              set: function_params_in_func
-
-    - match: '(?<=\.){{name}}(?=\s*\()'
-      scope: variable.function.c++
-      push:
-        - match: '\('
-          set: function_params_in_func
-
-    - match: \bconst\b
-      scope: storage.modifier.c++
-      push:
-        - match: \b(static|inline|const|extern)\b
-          scope: storage.modifier.c++
-        - match: \b{{type_name}}\b
-          scope: storage.type.c++
-          set: possible_const_variable_in_func
-
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
 
     - match: \b{{type_name}}\b
       scope: storage.type.c++
-      push: variable_in_func
 
-    - match: (?<=\s)=(?=\s)
-      scope: keyword.operator.assignment
+    - match: '(->|\.|::)'
+      scope: punctuation.accessor.c++
+
+    - match: (==|\|\||&&|<=|>=|<|>|!=)
+      scope: keyword.operator.logical.c++
+
+    - match: =
+      scope: keyword.operator.assignment.c++
+
+    - match: (&|\||!|\^)
+      scope: keyword.operator.bitwise.c++
+
+    - match: (\+|-|\*|\\)
+      scope: keyword.operator.arithmetic.c++
 
   function_params_in_func:
     - meta_content_scope: function_params
