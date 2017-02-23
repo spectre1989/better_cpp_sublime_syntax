@@ -6,7 +6,7 @@
 # todo(jbr) forward decls
 # todo(jbr) variable.language for 'this'
 # todo(jbr) variable.other.member for member variables (not functions)
-# note to self - lookaheads don't consume, captures do
+# todo(jbr) asterisk in pointer types scoped as arithmetic
 name: C/C++ (better)
 file_extensions: [h, c, hpp, cpp, inl]
 scope: source.c++
@@ -25,21 +25,21 @@ contexts:
       scope: keyword.control.c++
       set: namespace_name
 
-    - match: \bconst\b
-      scope: storage.modifier.c++
-      set:
-        - match: \b(static|inline|const|extern)\b
-          scope: storage.modifier.c++
-        - match: \b{{type_name}}\b
+    - match: \b{{name}}\b(?=\s*\()
+      scope: entity.name.function
+      push:
+        - match: ;
+          pop: true
+        - match: '{'
+          set: function_body
+        - include: common
+        - match: \b{{name}}\b(?=\s*[,\)])
+          scope: variable.parameter
+        - match: \b{{name}}\b
           scope: storage.type.c++
-          set: possible_const_variable_or_function
 
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
-
-    - match: \b{{type_name}}\b
+    - match: \b{{name}}\b
       scope: storage.type.c++
-      set: variable_or_function
 
   common:
     # Strings begin and end with quotes, and use backslashes as an escape
@@ -112,58 +112,6 @@ contexts:
     - match: '{'
       pop: true
 
-# after opening parenthesis, this finds params
-  function_params:
-    - match: '\)'
-      set:
-        - match: \bconst\b
-          scope: storage.modifier.c++
-        - match: ;
-          pop: true
-        - match: '{'
-          set: function_body
-    - match: \bconst\b
-      scope: storage.modifier.c++
-    - include: common
-    - match: \b{{name}}\b
-      scope: storage.type.c++
-      set:
-        - match: \b{{name}}\b
-          scope: variable.parameter.c++
-          set: function_params
-
-  possible_const_variable_or_function:
-    # if we find a *, then the const is part of the type, e.g.
-    # char const* str = "xyz";
-    # str is not actually const, it's a non const ptr to const char
-    - match: '\*'
-      set: variable_or_function
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
-    - match: '\b{{name}}(?=\s*\()'
-      scope: entity.name.function.c++
-      set: after_function_name
-    - match: \b{{name}}\b
-      scope: variable.other.constant.c++
-      pop: true
-
-  after_function_name:
-    - match: '\('
-      set: function_params
-
-  variable_or_function:
-    - match: \bconst\b
-      scope: storage.modifier.c++
-      set: possible_const_variable_or_function
-    - match: \b(static|inline|const|extern)\b
-      scope: storage.modifier.c++
-    - match: '\b{{name}}(?=\s*\()'
-      scope: entity.name.function.c++
-      set: after_function_name
-    - match: \b{{name}}\b
-      scope: variable.other.readwrite.c++
-      pop: true
-
   function_body:
     - meta_scope: function
 
@@ -189,13 +137,6 @@ contexts:
 
     - match: '{{variable_in_function}}'
       scope: variable.other.c++
-
-    # attempting to match something like:
-    # std::string s("value");
-    - match: '\b({{name}})\b\s+\b({{name}})\b(?=\s*\()'
-      captures:
-        1: storage.type.c++
-        2: variable.other.c++
 
     - match: \b{{name}}\b(?=\s*\()
       scope: variable.function.c++
