@@ -1,8 +1,5 @@
 %YAML 1.2
 ---
-# todo(jbr) punctuation.accessor for :: . ->
-# todo(jbr) entity.name.function when defined, variable.function when invoked
-# todo(jbr) do we need anything for the * or & symbols in variables?
 # todo(jbr) forward decls
 # todo(jbr) variable.language for 'this'
 # todo(jbr) variable.other.member for member variables (not functions)
@@ -13,7 +10,8 @@ scope: source.c++
 variables:
   name: '[A-Za-z_]\w*'
   type_name: '[A-Za-z_][\w:]*' # types can have :: in for example std::string
-  variable_in_function: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])'
+  variable: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])'
+  member_variable: '(?<=::|\.|->){{variable}}'
 contexts:
   main:
     - include: common
@@ -21,18 +19,29 @@ contexts:
     - match: '#'
       push: preprocessor
 
-    - match: \bnamespace\b
+    - match: \b(namespace|new|delete\[\]|delete|return)\b
       scope: keyword.control.c++
       set: namespace_name
 
+    - match: \b(static|inline|const|extern)\b
+      scope: storage.modifier.c++
+
+    - match: '{{member_variable}}'
+      scope: variable.other.member.c++
+
+    - match: '{{variable}}'
+      scope: variable.other.c++
+
     - match: \b{{name}}\b(?=\s*\()
-      scope: entity.name.function
+      scope: entity.name.function.c++
       push:
         - match: ;
           pop: true
         - match: '{'
           set: function_body
         - include: common
+        - match: \bconst\b
+          scope: storage.modifier.c++
         - match: \b{{name}}\b(?=\s*[,\)])
           scope: variable.parameter
         - match: \b{{name}}\b
@@ -113,8 +122,6 @@ contexts:
       pop: true
 
   function_body:
-    - meta_scope: function
-
     - match: '{'
       push: function_body
 
@@ -126,16 +133,16 @@ contexts:
     - match: \b(if|else|for|while|do)\b
       scope: keyword.control.conditional.c++
 
-    - match: \b(return)\b
+    - match: \b(namespace|new|delete\[\]|delete|return)\b
       scope: keyword.control.c++
 
     - match: \b(const|static)\b
       scope: storage.modifier.c++
 
-    - match: '(?<=::|\.|->){{variable_in_function}}'
+    - match: '{{member_variable}}'
       scope: variable.other.member.c++
 
-    - match: '{{variable_in_function}}'
+    - match: '{{variable}}'
       scope: variable.other.c++
 
     - match: \b{{name}}\b(?=\s*\()
