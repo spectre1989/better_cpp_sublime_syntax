@@ -13,18 +13,61 @@ variables:
   variable: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])'
   member_variable: '(?<=::|\.|->){{variable}}'
 contexts:
+  prototype:
+    # Comments begin with a '//' and finish at the end of the line
+    - match: '//'
+      scope: punctuation.definition.comment.c++
+      push: line_comment
+
+    # Block comments
+    - match: '/\*'
+      scope: punctuation.definition.comment.c++
+      push: block_comment
+
   main:
     - include: common
 
     - match: '#'
       push: preprocessor
 
-    - match: \b(namespace|new|delete\[\]|delete|return)\b
+    - match: \bnamespace\b
       scope: keyword.control.c++
       set: namespace_name
 
+    - match: \b(new|delete\[\]|delete|return)\b
+      scope: keyword.control.c++
+
+    - match: \btypedef\b
+      scope: storage.modifier.c++
+      push:
+        - match: \b({{type_name}})\b\s*\b({{type_name}})\b\s*;
+          captures:
+            1: storage.type.c++
+            2: entity.name.type.c++
+          pop: true
+
+        - match: \b{{type_name}}\b
+          scope: storage.type.c++
+
     - match: \b(static|inline|const|extern)\b
       scope: storage.modifier.c++
+
+    - match: \benum\b
+      scope: storage.modifier.c++
+      push:
+        - match: \bclass\b
+          scope: storage.modifier.c++
+
+        - match: \b{{type_name}}\b
+          scope: storage.type.c++
+        
+        - match: \{
+          set:
+            - match: \}
+              pop: true
+
+            - match: \b{{name}}\b
+              scope: variable.other.member.c++ # no way to distinguish between member variable and enum when you have code like SomeEnum::EnumValue
 
     - match: '{{member_variable}}'
       scope: variable.other.member.c++
@@ -57,16 +100,6 @@ contexts:
       scope: punctuation.definition.string.begin.c++
       push: double_quoted_string
 
-    # Comments begin with a '//' and finish at the end of the line
-    - match: '//'
-      scope: punctuation.definition.comment.c++
-      push: line_comment
-
-    # Block comments
-    - match: '/\*'
-      scope: punctuation.definition.comment.c++
-      push: block_comment
-
     # Numbers
     - match: '\b[-]?[0-9]+[.]?[0-9]*[f]?\b'
       scope: constant.numeric.c++
@@ -76,6 +109,7 @@ contexts:
       scope: constant.language.c++
 
   double_quoted_string:
+    - meta_include_prototype: false
     - meta_scope: string.quoted.double.c++
     - match: '\\.'
       scope: constant.character.escape.c++
