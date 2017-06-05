@@ -10,7 +10,7 @@ scope: source.c++
 variables:
   name: '[A-Za-z_]\w*'
   type_name: '[A-Za-z_][\w:]*' # types can have :: in for example std::string
-  variable: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.-])'
+  variable: '\b{{name}}\b(?=\s*[;=\<>)\|&\^\.\-\+\*\\])'
   member_variable: '(?<=::|\.|->){{variable}}'
 contexts:
   prototype:
@@ -25,9 +25,13 @@ contexts:
       push: block_comment
 
   main:
+    - meta_scope: meta.main
     - include: common
 
     - match: '#'
+      push: preprocessor
+
+    - match: __pragma
       push: preprocessor
 
     - match: \bnamespace\b
@@ -156,6 +160,7 @@ contexts:
       pop: true
 
   function_body:
+    - meta_scope: meta.functionbody
     - match: '{'
       push: function_body
 
@@ -164,14 +169,23 @@ contexts:
 
     - include: common
 
-    - match: \b(if|else|for|while|do)\b
+    - match: \b(if|else|for|while|do|switch|case)\b
       scope: keyword.control.conditional.c++
 
-    - match: \b(namespace|new|delete\[\]|delete|return)\b
+    - match: \b(namespace|new|delete\[\]|delete|return|break)\b
       scope: keyword.control.c++
 
-    - match: \b(const|static)\b
+    - match: \b(const|constexpr|static)\b
       scope: storage.modifier.c++
+
+    # eek, assuming this is a cast
+    - match: '\((?={{name}})'
+      push:
+        - match: \)
+          pop: true
+
+        - match: '{{name}}'
+          scope: storage.type.c++.eh
 
     - match: '{{member_variable}}'
       scope: variable.other.member.c++
